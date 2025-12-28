@@ -26,8 +26,6 @@ except ImportError as e:
                 config = yaml.safe_load(f)
                 return config
         else:
-            # Varsayılan config
-            print("⚠️  config.yaml bulunamadı, varsayılan config kullanılıyor")
             return {
                 'data': {'num_samples': 2000},
                 'paths': {'raw_data': 'data/samples.csv'}
@@ -41,158 +39,129 @@ class FinancialDataGenerator:
         random.seed(42)
         np.random.seed(42)
         
-        # Finansal terimler sözlüğü
+        # --- GÜNCELLENMİŞ SÖZLÜK (Normalize edilmiş) ---
+        # utils.py'deki clean_text fonksiyonu ile tam uyumlu olması için 
+        # Türkçe karakterlerden arındırılmış kelimeler kullanıyoruz.
         self.financial_terms = {
             'positive': [
-                'yükseliş', 'artış', 'kazanç', 'kar', 'büyüme', 'olumlu',
-                'güçlü', 'sağlam', 'başarılı', 'iyi', 'rekor', 'müthiş',
-                'harika', 'pozitif', 'gelişme', 'ilerleme', 'fayda', 'getiri',
-                'kârlı', 'verimli', 'istikrarlı', 'güvenli', 'cazip', 'parlak'
+                'yukselis', 'artis', 'kazanc', 'kar', 'buyume', 'olumlu',
+                'guclu', 'saglam', 'basarili', 'iyi', 'rekor', 'muthis',
+                'harika', 'pozitif', 'gelisme', 'ilerleme', 'fayda', 'getiri',
+                'karli', 'verimli', 'istikrarli', 'guvenli', 'cazip', 'parlak',
+                'tavan', 'zirve', 'patlama', 'cosku', 'ralli', 'firsat', 'prim'
             ],
             'negative': [
-                'düşüş', 'kayıp', 'zarar', 'başarısız', 'kötü', 'zayıf',
-                'olumsuz', 'düşük', 'kriz', 'risk', 'korku', 'panik',
-                'kaygı', 'endişe', 'çöküş', 'negatif', 'kayıp', 'zarar',
-                'tehlikeli', 'istikrarsız', 'belirsiz', 'tedirgin', 'baskı'
+                'dusus', 'kayip', 'zarar', 'basarisiz', 'kotu', 'zayif',
+                'olumsuz', 'dusuk', 'kriz', 'risk', 'korku', 'panik',
+                'kaygi', 'endise', 'cokus', 'negatif', 'tehlikeli', 
+                'istikrarsiz', 'belirsiz', 'tedirgin', 'baski',
+                'taban', 'iflas', 'borc', 'temerrut', 'satis', 'cikis', 'dip'
             ],
             'companies': [
                 'THYAO', 'AKBNK', 'GARAN', 'ISCTR', 'YKBNK', 'ASELS',
                 'TAVHL', 'BIMAS', 'MGROS', 'SAHOL', 'KCHOL', 'SASA',
                 'PETKM', 'TUPRS', 'FROTO', 'TCELL', 'EREGL', 'TOASO',
-                'ARCLK', 'HEKTS', 'ENKAI', 'KORDS', 'VAKBN', 'GUBRF'
+                'ARCLK', 'HEKTS', 'ENKAI', 'KORDS', 'VAKBN', 'GUBRF',
+                'ODAS', 'KOZAL', 'KARDM', 'VESTL', 'SISE', 'PGSUS'
             ],
             'sectors': [
                 'banka', 'havayolu', 'savunma', 'perakende', 'otomotiv',
-                'enerji', 'kimya', 'telekom', 'çelik', 'gayrimenkul',
-                'teknoloji', 'sağlık', 'ulaşım', 'gıda', 'inşaat'
+                'enerji', 'kimya', 'telekom', 'celik', 'gayrimenkul',
+                'teknoloji', 'saglik', 'ulasim', 'gida', 'insaat',
+                'turizm', 'madencilik', 'tekstil'
             ],
             'verbs': [
-                'açıkladı', 'bildirdi', 'duyurdu', 'ilan etti', 'paylaştı',
-                'raporladı', 'sunuldu', 'belirtildi', 'ifade edildi',
-                'açıklandı', 'yayınlandı', 'iletildi', 'bildirildi'
+                'acikladi', 'bildirdi', 'duyurdu', 'ilan etti', 'paylasti',
+                'raporladi', 'sunuldu', 'belirtildi', 'ifade edildi',
+                'aciklandi', 'yayinlandi', 'iletildi', 'bildirildi',
+                'gerceklesti', 'tamamlandi'
             ],
             'nouns': [
-                'kar', 'ciro', 'satış', 'büyüme', 'performans', 'sonuç',
+                'kar', 'ciro', 'satis', 'buyume', 'performans', 'sonuc',
                 'rapor', 'veri', 'istatistik', 'analiz', 'tahmin', 'beklenti',
-                'projeksiyon', 'öngörü', 'değerlendirme', 'inceleme'
+                'projeksiyon', 'ongoru', 'degerlendirme', 'inceleme',
+                'bilanco', 'temettu', 'gelir', 'hedef', 'butce'
             ]
         }
         
-        # Template'ler farklı duygu skorları için
         self.templates = self._create_templates()
     
     def _create_templates(self):
         """Duygu skorlarına göre template'ler oluştur"""
         return {
             'very_positive': [
-                "{company} hissesi {positive} bir {noun} {verb}! Yatırımcılar mutlu.",
-                "Şirketin {positive} {noun} açıklaması piyasayı hareketlendirdi.",
-                "{company} için {positive} haberler geliyor, fiyatlar tırmanıyor.",
-                "Analistler {company} hissesine güçlü alım önerisi verdi.",
-                "{sector} sektöründe {positive} gelişmeler yaşanıyor.",
-                "{company} {positive} {noun} rakamlarıyla dikkat çekti.",
-                "Yatırımcılar {company} hissesinde {positive} hareket bekliyor.",
-                "{company} {verb} {positive} bir {noun} performansı sergiledi."
+                "{company} hissesi {positive} bir {noun} {verb}! Yatirimcilar mutlu.",
+                "Sirketin {positive} {noun} aciklamasi piyasayi hareketlendirdi.",
+                "{company} icin {positive} haberler geliyor, fiyatlar tirmaniyor.",
+                "Analistler {company} hissesine guclu alim onerisi verdi.",
+                "{sector} sektorunde {positive} gelismeler yasaniyor.",
+                "{company} {positive} {noun} rakamlariyla dikkat cekti.",
+                "Yatirimcilar {company} hissesinde {positive} hareket bekliyor.",
+                "{company} {verb} {positive} bir {noun} performansi sergiledi."
             ],
             'positive': [
-                "{company} hissesinde {positive} yönde hareketler gözleniyor.",
-                "Şirketin {noun} performansı {positive} olarak değerlendiriliyor.",
-                "{company} için {positive} sinyaller alınıyor.",
-                "{sector} sektörü {positive} bir seyir izliyor.",
+                "{company} hissesinde {positive} yonde hareketler gozleniyor.",
+                "Sirketin {noun} performansi {positive} olarak degerlendiriliyor.",
+                "{company} icin {positive} sinyaller aliniyor.",
+                "{sector} sektoru {positive} bir seyir izliyor.",
                 "{company} {verb} {positive} {noun} verileri.",
-                "Piyasada {company} hissesine yönelik {positive} hava hakim.",
-                "{company} hissesi {positive} bir trend içinde."
+                "Piyasada {company} hissesine yonelik {positive} hava hakim.",
+                "{company} hissesi {positive} bir trend icinde."
             ],
             'neutral': [
                 "{company} hissesi normal seyirde ilerliyor.",
-                "Şirket beklentileri karşıladı, piyasa tepkisiz.",
-                "{company} hissesinde önemli bir hareket yok.",
-                "{sector} sektöründe dengeli bir seyir hakim.",
-                "{company} {verb} beklenen {noun} rakamlarını.",
+                "Sirket beklentileri karsiladi, piyasa tepkisiz.",
+                "{company} hissesinde onemli bir hareket yok.",
+                "{sector} sektorunde dengeli bir seyir hakim.",
+                "{company} {verb} beklenen {noun} rakamlarini.",
                 "Piyasa {company} hissesini izlemeye devam ediyor.",
-                "{company} hissesi teknik analizde nötr bölgede."
+                "{company} hissesi teknik analizde notr bolgede."
             ],
             'negative': [
-                "{company} hissesinde {negative} yönde gelişmeler var.",
-                "Şirketin {noun} performansı {negative} olarak değerlendirildi.",
-                "{company} için {negative} riskler görülüyor.",
-                "{sector} sektöründe {negative} hava hakim.",
+                "{company} hissesinde {negative} yonde gelismeler var.",
+                "Sirketin {noun} performansi {negative} olarak degerlendirildi.",
+                "{company} icin {negative} riskler goruluyor.",
+                "{sector} sektorunde {negative} hava hakim.",
                 "{company} {verb} {negative} {noun} verileri.",
-                "Piyasada {company} hissesine yönelik {negative} beklentiler var.",
+                "Piyasada {company} hissesine yonelik {negative} beklentiler var.",
                 "{company} hissesi {negative} bir trende girdi."
             ],
             'very_negative': [
-                "{company} hissesi {negative} bir {noun} {verb}! Yatırımcılar endişeli.",
-                "Şirketten gelen {negative} haberler piyasayı sarstı.",
-                "{company} hissesi için alarm zilleri çalıyor.",
-                "{sector} sektöründe kriz sinyalleri artıyor.",
-                "{company} {negative} {noun} rakamlarıyla şok etti.",
-                "Yatırımcılar {company} hissesinden hızla çıkış yapıyor.",
-                "{company} {verb} {negative} bir {noun} performansı."
+                "{company} hissesi {negative} bir {noun} {verb}! Yatirimcilar endiseli.",
+                "Sirketten gelen {negative} haberler piyasayi sarsti.",
+                "{company} hissesi icin alarm zilleri caliyor.",
+                "{sector} sektorunde kriz sinyalleri artiyor.",
+                "{company} {negative} {noun} rakamlariyla sok etti.",
+                "Yatirimcilar {company} hissesinden hizla cikis yapiyor.",
+                "{company} {verb} {negative} bir {noun} performansi.",
+                "{company} hissesi taban oldu, {negative} haberler etkili."
             ]
         }
     
     def _get_sentiment_category(self, score):
         """Skora göre duygu kategorisi belirle"""
-        if score >= 7:
-            return 'very_positive'
-        elif score >= 3:
-            return 'positive'
-        elif score >= -2:
-            return 'neutral'
-        elif score >= -6:
-            return 'negative'
-        else:
-            return 'very_negative'
+        if score >= 7: return 'very_positive'
+        elif score >= 3: return 'positive'
+        elif score >= -2: return 'neutral'
+        elif score >= -6: return 'negative'
+        else: return 'very_negative'
     
     def _add_variations(self, text, score):
-        """Metne çeşitlilik ekle (hashtag, emoji, vs.)"""
+        """Metne çeşitlilik ekle (hashtag vb.)"""
         variations = []
-        
         # Hashtag ekle (%40 ihtimal)
         if random.random() < 0.4:
-            hashtags = ['#borsa', '#yatırım', '#hisse', '#finans', '#ekonomi', 
+            hashtags = ['#borsa', '#yatirim', '#hisse', '#finans', '#ekonomi', 
                        '#bist', '#piyasa', '#analiz', '#trade', '#para']
             text += " " + random.choice(hashtags)
             variations.append("hashtag")
-        
-        # Emoji ekle (%30 ihtimal)
-        if random.random() < 0.3:
-            if score > 5:
-                emojis = ["🚀", "📈", "💹", "💰", "🎯", "⭐"]
-                text = random.choice(emojis) + " " + text
-            elif score < -5:
-                emojis = ["📉", "💥", "🔥", "⚠️", "🔻", "😱"]
-                text = random.choice(emojis) + " " + text
-            else:
-                emojis = ["📊", "📋", "📰", "ℹ️", "🔍", "👁️"]
-                text = random.choice(emojis) + " " + text
-            variations.append("emoji")
-        
-        # Kısaltma ekle (%20 ihtimal)
-        if random.random() < 0.2:
-            abbreviations = ["FYI", "IMO", "BTW", "TLDR", "FWIW", "YTD"]
-            text += " (" + random.choice(abbreviations) + ")"
-            variations.append("abbreviation")
-        
-        # Yazım hatası ekle (%10 ihtimal)
-        if random.random() < 0.1:
-            # Basit bir yazım hatası simülasyonu
-            if len(text) > 20:
-                pos = random.randint(5, len(text)-5)
-                text = text[:pos] + text[pos+1] + text[pos] + text[pos+2:]
-                variations.append("typo")
-        
         return text, variations
     
     def generate_text(self, sentiment_score):
         """Duygu skoruna göre metin üret"""
         category = self._get_sentiment_category(sentiment_score)
-        
-        # Template seç
         template = random.choice(self.templates[category])
         
-        # Yer tutucuları doldur
         replacements = {
             'company': random.choice(self.financial_terms['companies']),
             'sector': random.choice(self.financial_terms['sectors']),
@@ -202,12 +171,8 @@ class FinancialDataGenerator:
             'negative': random.choice(self.financial_terms['negative'])
         }
         
-        # Template'i doldur
         text = template.format(**replacements)
-        
-        # Çeşitlilik ekle
         text, variations = self._add_variations(text, sentiment_score)
-        
         return text
     
     def generate_dataset(self, num_samples=None):
@@ -219,38 +184,27 @@ class FinancialDataGenerator:
         print("=" * 60)
         
         data = []
-        progress_step = max(1, num_samples // 10)  # Her %10'da bir ilerleme göster
+        progress_step = max(1, num_samples // 10)
         
         for i in range(num_samples):
-            # Daha gerçekçi dağılım için normal dağılım kullan
-            # Ortalama 0, standart sapma 4 ile normal dağılım
+            # Normal dağılım ile skor üretimi
             raw_score = np.random.normal(0, 4)
-            
-            # -10 ile +10 arasına kırp ve yuvarla
             sentiment_score = np.clip(raw_score, -10, 10)
             sentiment_score = round(sentiment_score, 1)
             
-            # Metin üret
             text = self.generate_text(sentiment_score)
             
-            # Tarih oluştur (son 2 yıl içinde)
+            # Rastgele tarih
             start_date = datetime(2022, 1, 1)
-            end_date = datetime(2023, 12, 31)
             random_date = start_date + timedelta(days=random.randint(0, 729))
             
-            # Kategori belirle
-            if sentiment_score >= 7:
-                category = "Çok Olumlu"
-            elif sentiment_score >= 3:
-                category = "Olumlu"
-            elif sentiment_score >= -2:
-                category = "Nötr"
-            elif sentiment_score >= -6:
-                category = "Olumsuz"
-            else:
-                category = "Çok Olumsuz"
+            # Kategori
+            if sentiment_score >= 7: category = "Çok Olumlu"
+            elif sentiment_score >= 3: category = "Olumlu"
+            elif sentiment_score >= -2: category = "Nötr"
+            elif sentiment_score >= -6: category = "Olumsuz"
+            else: category = "Çok Olumsuz"
             
-            # Veriyi ekle
             data.append({
                 'id': f"FIN_{i+1:06d}",
                 'text': text,
@@ -262,12 +216,10 @@ class FinancialDataGenerator:
                 'company': text.split()[0] if text.split() else 'UNKNOWN'
             })
             
-            # İlerleme çubuğu
             if (i + 1) % progress_step == 0:
                 progress = (i + 1) / num_samples * 100
                 print(f"  ██████████████████ {progress:.0f}% tamamlandı ({i + 1}/{num_samples})")
         
-        # DataFrame oluştur
         df = pd.DataFrame(data)
         
         print("\n" + "=" * 60)
@@ -275,15 +227,6 @@ class FinancialDataGenerator:
         print(f"\n📈 İstatistikler:")
         print(f"   Toplam örnek: {len(df)}")
         print(f"   Skor aralığı: {df['sentiment_score'].min():.1f} - {df['sentiment_score'].max():.1f}")
-        print(f"   Ortalama skor: {df['sentiment_score'].mean():.2f}")
-        print(f"   Standart sapma: {df['sentiment_score'].std():.2f}")
-        
-        # Kategori dağılımı
-        print("\n🎯 Kategori Dağılımı:")
-        category_dist = df['category'].value_counts().sort_index()
-        for cat, count in category_dist.items():
-            percentage = count / len(df) * 100
-            print(f"   {cat:<15}: {count:>4} ({percentage:5.1f}%)")
         
         return df
     
@@ -291,74 +234,28 @@ class FinancialDataGenerator:
         """Dataset'i kaydet"""
         if filepath is None:
             filepath = self.config['paths']['raw_data']
-        
-        # Klasörü oluştur
-        import os
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        
-        # CSV olarak kaydet
+        # UTF-8-SIG kullanarak kaydet (Excel'de Türkçe karakter sorunu olmasın diye, 
+        # gerçi içerik normalize ama başlıklar için iyi olur)
         df.to_csv(filepath, index=False, encoding='utf-8-sig')
         print(f"\n💾 Veri kaydedildi: {filepath}")
-        print(f"   Dosya boyutu: {os.path.getsize(filepath) / 1024:.1f} KB")
-        
         return filepath
     
     def analyze_dataset(self, df):
-        """Dataset'i analiz et ve raporla"""
+        """Basit analiz"""
         print("\n📊 VERİ ANALİZ RAPORU")
-        print("=" * 60)
-        
-        # Temel istatistikler
-        print("1. Temel İstatistikler:")
-        print(f"   - Örnek sayısı: {len(df)}")
-        print(f"   - Benzersiz şirketler: {df['company'].nunique()}")
-        print(f"   - Tarih aralığı: {df['date'].min()} - {df['date'].max()}")
-        
-        # Skor dağılımı
-        print("\n2. Skor Dağılımı:")
-        score_stats = df['sentiment_score'].describe()
-        print(f"   - Ortalama: {score_stats['mean']:.2f}")
-        print(f"   - Medyan: {df['sentiment_score'].median():.2f}")
-        print(f"   - Standart Sapma: {score_stats['std']:.2f}")
-        print(f"   - Min: {score_stats['min']:.1f}")
-        print(f"   - Max: {score_stats['max']:.1f}")
-        
-        # Metin uzunlukları
-        df['text_length'] = df['text'].apply(lambda x: len(str(x).split()))
-        print("\n3. Metin Uzunlukları:")
-        length_stats = df['text_length'].describe()
-        print(f"   - Ortalama kelime: {length_stats['mean']:.1f}")
-        print(f"   - Min kelime: {length_stats['min']:.0f}")
-        print(f"   - Max kelime: {length_stats['max']:.0f}")
-        
+        print("-" * 20)
+        print(f"Örnek sayısı: {len(df)}")
         return df
 
 def main():
-    """Ana fonksiyon"""
     print("🚀 Finansal Duygu Analizi - Sentetik Veri Üretici")
     print("=" * 60)
-    
-    # Generator oluştur
     generator = FinancialDataGenerator()
-    
-    # Dataset oluştur
     df = generator.generate_dataset()
-    
-    # Dataset'i analiz et
     generator.analyze_dataset(df)
-    
-    # Dataset'i kaydet
     output_path = generator.save_dataset(df)
-    
-    print("\n" + "=" * 60)
-    print("🎉 Sentetik veri üretimi başarıyla tamamlandı!")
-    print(f"📁 Veri dosyası: {output_path}")
-    
-    # İlk 3 örneği göster
-    print("\n📝 Örnek Metinler:")
-    for i in range(min(3, len(df))):
-        print(f"\n{i+1}. Skor: {df.iloc[i]['sentiment_score']:5.1f} - {df.iloc[i]['category']}")
-        print(f"   Metin: {df.iloc[i]['text']}")
+    print(f"\n✅ İşlem tamamlandı. Dosya: {output_path}")
 
 if __name__ == "__main__":
     main()

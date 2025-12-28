@@ -18,12 +18,23 @@ def load_config(config_path="config.yaml"):
     return config
 
 def clean_text(text):
-    """Metni temizle"""
+    """Metni temizle ve normalize et"""
     if not isinstance(text, str):
         return ""
     
     # Küçük harfe çevir
     text = text.lower()
+    
+    # --- KRİTİK DÜZELTME BAŞLANGICI ---
+    # Türkçe karakterleri ve şapkalı harfleri normalize et
+    # Bu sayede 'kâr' = 'kar', 'düşüş' = 'dusus' olur ve model şaşırmaz.
+    replacements = {
+        'â': 'a', 'î': 'i', 'û': 'u',
+        'ş': 's', 'ı': 'i', 'ğ': 'g', 'ç': 'c', 'ü': 'u', 'ö': 'o'
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    # --- KRİTİK DÜZELTME BİTİŞİ ---
     
     # URL'leri kaldır
     text = re.sub(r'http\S+|www\S+|https\S+', '', text)
